@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "altyazi-senkron"
+version = "0.1.0"
+description = "AI destekli, yüksek hassasiyetli film ve dizi altyazı senkronizasyon aracı."
+authors = [{ name = "Fatih" }]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "faster-whisper>=1.0.0",
+    "ctranslate2>=4.0.0",
+    "onnxruntime>=1.14.0",
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "charset-normalizer>=3.0.0",
+]
+
+[project.scripts]
+altyazi-senkron = "altyazi_senkron.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
