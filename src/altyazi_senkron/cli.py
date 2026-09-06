@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.markup import escape
 
 # Suppress HuggingFace Hub unauthenticated warning and general logging noise
 os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
@@ -267,7 +268,7 @@ def sync_command(
         console.print(f"\n[bold red]Hata:[/bold red] {err}")
         raise typer.Exit(code=1)
 
-    console.print(f"[bold green]✔ Altyazı başarıyla kaydedildi:[/bold green] [underline]{output}[/underline]\n")
+    console.print(f"[bold green]✔ Altyazı başarıyla kaydedildi:[/bold green] [underline]{escape(str(output))}[/underline]\n")
 
     # Özet Tablosu
     table = Table(title="Senkronizasyon Sonuç Raporu", show_header=True, header_style="bold magenta")
@@ -366,7 +367,7 @@ def batch_command(
     pair_table.add_column("#", width=4)
     pair_table.add_column("Video Dosyası")
     pair_table.add_column("Kaynak Altyazı (.tr.srt)")
-    pair_table.add_column("Hedef Çıktı (.tr[synced].srt)")
+    pair_table.add_column(escape("Hedef Çıktı (.tr[synced].srt)"))
     pair_table.add_column("Durum", width=12)
 
     to_process: List[Tuple[Path, Path, Path]] = []
@@ -377,12 +378,12 @@ def batch_command(
             status_str = "[bold green]Kuyrukta[/bold green]"
             to_process.append((vid, sub, out))
 
-        pair_table.add_row(str(idx), vid.name, sub.name, out.name, status_str)
+        pair_table.add_row(str(idx), escape(vid.name), escape(sub.name), escape(out.name), status_str)
 
     console.print(pair_table)
 
     if not to_process:
-        console.print("\n[bold green]Tüm dosyalar zaten senkronize edilmiş (.tr[synced].srt mevcut).[/bold green] Yeniden senkronlamak için [bold]--force[/bold] kullanabilirsiniz.")
+        console.print(f"\n[bold green]Tüm dosyalar zaten senkronize edilmiş ({escape('.tr[synced].srt')} mevcut).[/bold green] Yeniden senkronlamak için [bold]--force[/bold] kullanabilirsiniz.")
         raise typer.Exit(code=0)
 
     console.print(f"\n[bold cyan]Senkronize edilecek {len(to_process)} dosya işleniyor...[/bold cyan]\n")
@@ -398,7 +399,7 @@ def batch_command(
     results_summary = []
 
     for idx, (vid, sub, out) in enumerate(to_process, start=1):
-        console.rule(f"[bold magenta]Dosya {idx}/{len(to_process)}: {vid.name}[/bold magenta]")
+        console.rule(f"[bold magenta]Dosya {idx}/{len(to_process)}: {escape(vid.name)}[/bold magenta]")
         
         prefix = f"[{idx}/{len(to_process)}] "
         success, res, metrics, err = process_single_sync(
@@ -416,7 +417,7 @@ def batch_command(
         )
 
         if success:
-            console.print(f"[bold green]✔ Tamamlandı:[/bold green] {out.name} [cyan](Güven: %{metrics['confidence_percentage']:.1f} | Durum: {metrics['status']})[/cyan]\n")
+            console.print(f"[bold green]✔ Tamamlandı:[/bold green] {escape(out.name)} [cyan](Güven: %{metrics['confidence_percentage']:.1f} | Durum: {metrics['status']})[/cyan]\n")
             results_summary.append({
                 "file": vid.name,
                 "status": metrics["status"],
@@ -446,11 +447,11 @@ def batch_command(
         st = r["status"]
         color = "green" if st in ["EXCELLENT", "GOOD"] else "yellow" if st == "ACCEPTABLE" else "red"
         summary_table.add_row(
-            r["file"],
+            escape(r["file"]),
             f"[{color}]{st}[/{color}]",
             r["confidence"],
             r["offset"],
-            r["output"],
+            escape(r["output"]),
         )
 
     console.print(summary_table)
