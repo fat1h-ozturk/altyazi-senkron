@@ -32,12 +32,14 @@ def get_synced_output_path(video_path: Path, subtitle_path: Path) -> Path:
     """
     Generates the output path ending with .tr[synced].srt
     """
-    # Prefer video stem so it matches the video file name
+    # Use the video file stem as the base name
     base_name = video_path.stem
-    # If base_name already ends with .tr, strip it to avoid .tr.tr[synced].srt
+    # Strip trailing ".tr" (case-insensitive) to avoid .tr.tr[synced].srt
     if base_name.lower().endswith(".tr"):
         base_name = base_name[:-3]
-        
+    # Also strip any trailing dots left after the removal above
+    base_name = base_name.rstrip(".")
+
     return video_path.parent / f"{base_name}.tr[synced].srt"
 
 

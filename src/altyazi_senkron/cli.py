@@ -109,11 +109,14 @@ def process_single_sync(
 
             # Gömülü altyazı yoksa veya kullanılmıyorsa ASR ile devam et
             if not speech_segments:
-                # 2. Sesi Çıkar
+                # 2. Sesi Çıkar — wav_path'i önceden temp_files'a ekle ki FFmpeg
+                # hata verse dahi finally bloğu geçici dosyayı temizleyebilsin.
+                import tempfile as _tmpmod
+                _tmp_wav = Path(_tmpmod.gettempdir()) / f"altyazi_senkron_{reference.stem}.wav"
+                temp_files.append(_tmp_wav)
                 status_msg = f"{progress_prefix}16kHz ses ayıklanıyor..." if progress_prefix else "16kHz ses ayıklanıyor (FFmpeg)..."
                 with console.status(f"[bold green]{status_msg}[/bold green]"):
-                    wav_path = extract_audio_wav(reference)
-                    temp_files.append(wav_path)
+                    wav_path = extract_audio_wav(reference, output_wav=_tmp_wav)
 
                 # 3. Konuşma Tespiti (Whisper + Silero VAD)
                 if detector is None:
@@ -265,7 +268,7 @@ def sync_command(
     )
 
     if not success:
-        console.print(f"\n[bold red]Hata:[/bold red] {err}")
+        console.print(f"\n[bold red]Hata:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1)
 
     console.print(f"[bold green]✔ Altyazı başarıyla kaydedildi:[/bold green] [underline]{escape(str(output))}[/underline]\n")
@@ -426,13 +429,13 @@ def batch_command(
                 "output": out.name,
             })
         else:
-            console.print(f"[bold red]✘ Hata:[/bold red] {err}\n")
+            console.print(f"[bold red]✘ Hata:[/bold red] {escape(str(err))}\n")
             results_summary.append({
                 "file": vid.name,
                 "status": "HATA",
                 "confidence": "-",
                 "offset": "-",
-                "output": err,
+                "output": escape(str(err)),
             })
 
     # Toplu İşlem Sonuç Özeti

@@ -88,10 +88,14 @@ class SubtitleSnapper:
             curr = snapped_items[i]
             nxt = snapped_items[i + 1]
             if curr.end + self.min_gap > nxt.start:
-                # If current ends after next starts, adjust current end
-                if nxt.start - self.min_gap > curr.start:
-                    curr.end = nxt.start - self.min_gap
+                # Prefer no-overlap over minimum duration guarantee.
+                # Clamp curr.end so there is always at least min_gap before next.
+                safe_end = nxt.start - self.min_gap
+                if safe_end > curr.start:
+                    curr.end = safe_end
                 else:
-                    curr.end = curr.start + self.min_subtitle_duration
+                    # Subtitles are so close together we can't fit even the gap;
+                    # keep curr as short as possible without going negative.
+                    curr.end = max(curr.start, nxt.start - self.min_gap)
 
         return snapped_items
