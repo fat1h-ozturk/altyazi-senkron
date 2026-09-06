@@ -1,143 +1,181 @@
 # altyazi-senkron
 
-**altyazi-senkron**, `ffsubsync` ve `alass-cli` gibi geleneksel araçların sıklıkla başarısız olduğu, anlamsız kaymalar yaptığı ve gürültüye takıldığı senaryoları çözmek için geliştirilmiş **yeni nesil, AI destekli ve yüksek hassasiyetli (%99+ kesinlik)** altyazı senkronizasyon aracıdır.
+**altyazi-senkron**, `ffsubsync` ve `alass-cli` gibi geleneksel araçların sıklıkla başarısız olduğu, anlamsız kaymalar yaptığı ve müzik/patlama seslerine takıldığı senaryoları çözmek için geliştirilmiş **yeni nesil, AI destekli ve yüksek hassasiyetli (%99+ kesinlik)** altyazı senkronizasyon aracıdır.
 
 ---
 
-## 🎯 Neden ffsubsync ve alass-cli Başarısız Olur?
+## 🎯 Neden altyazi-senkron?
 
 | Problem | ffsubsync / alass | altyazi-senkron |
 | :--- | :--- | :--- |
-| **Gürültü / Müzik Algılama** | WebRTC VAD müzik ve patlamaları "ses" sanır; yanlış sahneye kilitlenir. | **Faster-Whisper + Silero VAD** sadece gerçek insan konuşmalarını ayıklar, gürültüyü %100 eler. |
-| **Rastgele / Alakasız Kaymalar** | FFT Cross-Correlation yerel tepe noktalarına (local minima/maxima) takılır. | **RANSAC + Konuşma Parmak İzi (Fingerprinting)** ile aykırı değerler dışlanır, matematiksel küresel uyum bulunur. |
+| **Gürültü & Müzik Yanılgısı** | WebRTC VAD müzik ve patlamaları "ses" sanır; yanlış sahneye kilitlenir. | **Faster-Whisper + Silero VAD** sadece gerçek insan konuşmalarını ayıklar, gürültüyü tamamen eler. |
+| **Rastgele / Alakasız Kaymalar** | Çapraz korelasyon yerel tepe noktalarına takılıp altyazıyı $\pm 100$ sn kaydırabilir. | **RANSAC + Konuşma Parmak İzi (Fingerprinting)** ile aykırı değerler dışlanır, matematiksel küresel uyum bulunur. |
 | **FPS / Hız Farkı (Drift)** | 23.976 $\leftrightarrow$ 25 FPS dönüşümlerinde zamanla açılma yaşanabilir. | Standart film/video kare hızlarını otomatik dener ve en küçük sapmayı hesaplar. |
-| **Parçalı Kesintiler (Piecewise)** | TV reklam araları veya kesilmiş sahnelerde zincirleme olarak dağılır. | Değişim noktası analiziyle (Change-point detection) filmi parçalara ayırarak çözer. |
-| **Milisaniyelik Uyum (Snapping)** | Altyazı kabaca sahneye oturur fakat konuşmanın başladığı ana kenetlenmez. | **Snapper Motoru** ile altyazı başlangıç ve bitişini milisaniyelik ses sınırına kilitler. |
-| **Doğrulama ve Güven Skoru** | Hatalı çıksa bile kullanıcıya bildirmeden yanlış dosyayı yazar. | İşlem sonunda **Güven Skoru (%98.4)** ve örtüşme raporu sunar. |
+| **Parçalı Kesintiler (Piecewise)** | TV reklam araları veya kesilmiş sahnelerde zincirleme olarak dağılır. | **Değişim noktası analizi (Change-point)** ile filmi parçalara ayırarak çözer. |
+| **Milisaniyelik Uyum (Snapping)** | Altyazı kabaca oturur fakat diyalog başlangıcına tam kenetlenmez. | **Snapper Motoru** ile altyazı başlangıç ve bitişini konuşma sınırına kilitler. |
+| **Doğrulama ve Güven Skoru** | Hatalı çıksa bile kullanıcıya bildirmeden yanlış dosyayı kaydeder. | İşlem sonunda **Güven Skoru (%98.4)** ve örtüşme raporu sunar. |
 
 ---
 
-## 🚀 Kurulum
+## 🚀 Kurulum Rehberi
 
-### 1. Ön Gereksinim: FFmpeg
-Aracın video dosyalarından ses analizi yapabilmesi için sisteminizde `ffmpeg` kurulu olmalıdır:
-* **Ubuntu / Debian:** `sudo apt install ffmpeg`
-* **Fedora / RHEL:** `sudo dnf install ffmpeg`
-* **Arch Linux:** `sudo pacman -S ffmpeg`
-* **macOS:** `brew install ffmpeg`
-* **Windows:** `winget install Gyan.FFmpeg`
+Aracın videolardan ses analizi yapabilmesi için sisteminizde **FFmpeg** ve **Python (>= 3.9)** bulunmalıdır.
+
+### 1. Ön Gereksinim: FFmpeg Kurulumu
+
+* **Windows:** PowerShell'i yönetici olarak açın ve çalıştırın:
+  ```powershell
+  winget install Gyan.FFmpeg
+  ```
+* **Ubuntu / Debian:**
+  ```bash
+  sudo apt install ffmpeg
+  ```
+* **Fedora / RHEL:**
+  ```bash
+  sudo dnf install ffmpeg
+  ```
+* **Arch Linux:**
+  ```bash
+  sudo pacman -S ffmpeg
+  ```
+* **macOS:**
+  ```bash
+  brew install ffmpeg
+  ```
 
 ---
 
-### 2. Kurulum Yöntemleri
+### 2. İşletim Sistemine Göre Kurulum
 
-Repoyu klonlayın:
+Projeyi bilgisayarınıza klonlayın:
 ```bash
 git clone https://github.com/KULLANICI_ADINIZ/altyazi-senkron.git
 cd altyazi-senkron
 ```
 
-İstediğiniz kurulum yöntemini seçin:
+---
 
-#### Yöntem A: Otomatik Kurulum Scripti (En Kolay)
-Linux ve macOS için tek komutla her şeyi (sanal ortam, paketler ve global kısayol) otomatik kurar:
+#### 🪟 Windows Kurulumu (`pipx` ile - Önerilen)
+
+Windows'ta aracı herhangi bir klasörden (C:\, D:\ vb.) bağımsız bir program gibi çalıştırabilmek için **`pipx`** kullanılır.
+
+1. **pipx'in kurulu olduğundan emin olun:**
+   ```powershell
+   pip install pipx
+   pipx ensurepath
+   ```
+   *(Not: `pipx ensurepath` komutunu çalıştırdıktan sonra terminali bir kez kapatıp yeniden açın).*
+
+2. **altyazi-senkron'u kurun:**
+   ```powershell
+   pipx install .
+   ```
+
+> **Tebrikler!** Artık PowerShell, CMD veya Windows Terminal'de nerede olursanız olun doğrudan `altyazi-senkron` yazarak kullanabilirsiniz.
+
+---
+
+#### 🐧 Linux & macOS Kurulumu
+
+Aşağıdaki yöntemlerden birini seçebilirsiniz:
+
+##### Yöntem A: Otomatik Kurulum Scripti (En Kolay)
+Repodaki hazır script sanal ortamı kurar, bağımlılıkları yükler ve global komutu oluşturur:
 ```bash
 ./install.sh
 ```
 
-#### Yöntem B: pipx ile Kurulum (Önerilen CLI Standardı)
-Sisteminizde `pipx` varsa, bağımsız ve global bir araç olarak kurar:
+##### Yöntem B: pipx ile Kurulum
 ```bash
 pipx install .
 ```
 
-#### Yöntem C: Standart Python venv ile Kurulum
+##### Yöntem C: Klasik Python Sanal Ortam (`venv`)
 ```bash
-# Sanal ortam oluşturup aktifleştirin
 python3 -m venv .venv
 source .venv/bin/activate
-
-# Paketi kurun
 pip install -e .
 
-# (İsteğe bağlı) Her dizinden çalıştırabilmek için kısayol ekleyin:
+# Her dizinden doğrudan çalıştırabilmek için global kısayol ekleyin:
 mkdir -p ~/.local/bin
 ln -sf $(pwd)/.venv/bin/altyazi-senkron ~/.local/bin/altyazi-senkron
 ```
 
 ---
 
-## 💻 Kullanım
+## 💻 Kullanım Kılavuzu
+
+Kurulum tamamlandıktan sonra terminali **istediğiniz klasörde** açıp doğrudan komutları çalıştırabilirsiniz.
 
 ### 1. Toplu Dizi / Film Senkronizasyonu (`batch`)
-Bulunduğunuz klasördeki tüm video dosyalarını ve bunlara ait `.tr.srt` (veya `.srt`) altyazılarını otomatik olarak bulup tek seferde senkronize eder ve `.tr[synced].srt` olarak kaydeder:
+Bulunduğunuz klasördeki tüm video dosyalarını ve bunlara ait `.tr.srt` (veya `.srt`) altyazılarını otomatik tespit eder, sırayla senkronize eder ve `.tr[synced].srt` olarak kaydeder:
+
 ```bash
-# Bulunulan dizindeki tüm dizi bölümlerini tek seferde senkronla:
+# Bulunduğunuz klasördeki tüm bölümleri tek seferde senkronla:
 altyazi-senkron batch
 
-# Farklı bir klasörü senkronla:
-altyazi-senkron batch /home/fatih/Videolar/Diziler/BreakingBad/
+# Dışarıdan başka bir klasörü senkronla:
+altyazi-senkron batch "D:\Diziler\The Walking Dead\Season 03"
 ```
-* **Otomatik Eşleşme:** `S01E01`, `1x01` gibi bölüm numaralarını ve dosya adlarını akıllıca eşleştirir.
-* **Akıllı Bellek Kullanımı:** Yapay zeka modeli her bölüm için tekrar tekrar yüklenmez; bellekte tutularak sıradaki bölümler çok daha hızlı işlenir.
-* **Kaldığı Yerden Devam:** Zaten `.tr[synced].srt` üretilmiş bölümleri otomatik atlar (yeniden işlemek için `--force` parametresi verilebilir).
 
-### 2. Tek Bir Video ile Altyazı Senkronizasyonu (`sync`)
-Videonuzdaki ses yapay zeka ile analiz edilir ve altyazı sıfır hata ile sese kenetlenir:
+* **Otomatik Eşleşme:** `S01E01`, `1x01` gibi bölüm numaralarını akıllıca eşleştirir.
+* **Akıllı Model Önbelleği:** Yapay zeka modeli her bölüm için tekrar tekrar yüklenmez; bellekte tutulur ve sonraki bölümler çok daha hızlı işlenir.
+* **Kaldığı Yerden Devam:** Zaten `.tr[synced].srt` üretilmiş olan dosyalar otomatik atlanır (tekrar işlemek için `--force` eklenebilir).
+
+---
+
+### 2. Tek Bir Dosyayı Senkronize Etme (`sync`)
+Belirli bir video ve altyazıyı senkronize etmek için:
 ```bash
 altyazi-senkron sync film.mkv altyazi_tr.srt -o senkron_tr.srt
 ```
 
+---
+
 ### 3. Gömülü Altyazı Kısayolu (`--use-embedded`)
-Eğer videonuzda zaten orijinal dilde (örn. İngilizce) bir altyazı varsa, ses analizine hiç gerek kalmadan 2 saniyede Türkçe altyazıyı bu referansa kilitler:
+Videonuzun içinde zaten orijinal dilde (örn. İngilizce) gömülü bir altyazı varsa, ses analizine hiç girmeden **2 saniyede** Türkçe altyazıyı bu referansa kilitler:
 ```bash
-altyazi-senkron sync film.mkv altyazi_tr.srt --use-embedded -o senkron_tr.srt
+altyazi-senkron sync film.mkv altyazi_tr.srt --use-embedded
+# veya toplu işlemde:
+altyazi-senkron batch --use-embedded
 ```
+
+---
 
 ### 4. İki Altyazı Arası Senkronizasyon (Sub-to-Sub)
-Elinizde videoya tam uyan bir İngilizce altyazı ve kaymış bir Türkçe altyazı varsa:
+Elinizde videoyla tam uyumlu bir yabancı altyazı ve kaymış bir Türkçe altyazı varsa:
 ```bash
-altyazi-senkron sync uyumlu_en.srt kaymis_tr.srt -o duzeltilmis_tr.srt
+altyazi-senkron sync ingilizce.srt turkce.srt -o duzeltilmis_turkce.srt
 ```
 
-### 5. Model Boyutu ve Performans Seçenekleri
-Whisper modelini donanımınıza göre belirleyebilirsiniz (`tiny`, `base`, `small`, `medium`):
-```bash
-# Çok hızlı tarama (Hafif model):
-altyazi-senkron batch -m tiny
+---
 
-# Yüksek hassasiyet (Varsayılan):
-altyazi-senkron batch -m base
-```
-
-### 6. Medya Bilgilerini İnceleme
-Videodaki ses ve altyazı akışlarını listelemek için:
+### 5. Medya Bilgilerini İnceleme (`info`)
+Video dosyasındaki ses kanallarını ve gömülü altyazı akışlarını listelemek için:
 ```bash
 altyazi-senkron info film.mkv
 ```
 
 ---
 
-## ⚙️ Komut Parametreleri
+## ⚙️ Parametreler ve Seçenekler
 
-```text
-Usage: altyazi-senkron sync [OPTIONS] REFERENCE TARGET_SUB
-
-Seçenekler:
-  -o, --output PATH       Çıktı altyazı yolu. Varsayılan: <hedef>_synced.srt
-  -m, --model TEXT        Whisper model boyutu: tiny, base, small, medium [varsayılan: base]
-  -d, --device TEXT       cpu, cuda veya auto [varsayılan: auto]
-  --no-snap               Milisaniyelik konuşma kenetlemesini (snapping) kapatır.
-  --use-embedded          Videodaki gömülü altyazıyı otomatik referans alır.
-  -t, --threads INT       Kullanılacak CPU iş parçacığı sayısı. [varsayılan: sistem çekirdekleri]
-  --help                  Yardım mesajını görüntüler.
-```
+| Parametre | Açıklama |
+| :--- | :--- |
+| `-m, --model` | Whisper model boyutu: `tiny`, `base`, `small`, `medium` *(Varsayılan: `base`)* |
+| `-d, --device` | Donanım birimi: `cpu`, `cuda` veya `auto` *(Varsayılan: `auto`)* |
+| `--use-embedded` | Varsa videodaki gömülü altyazıyı referans alarak ses analizini atlar. |
+| `--no-snap` | Milisaniyelik diyalog kenetlemesini (snapping) devre dışı bırakır. |
+| `-f, --force` | *(batch)* Zaten `.tr[synced].srt` olsa bile tekrar senkronlar. |
+| `-r, --recursive` | *(batch)* Alt klasörleri de tarar. |
+| `-t, --threads` | Kullanılacak CPU iş parçacığı sayısı *(Varsayılan: sistem çekirdekleri)* |
 
 ---
 
 ## 🧪 Testleri Çalıştırma
 
-Tüm birim ve entegrasyon testlerini çalıştırmak için:
+Geliştiriciler için birim ve entegrasyon testleri:
 ```bash
 pytest -v
 ```
@@ -145,4 +183,4 @@ pytest -v
 ---
 
 ## 📄 Lisans
-MIT License
+Bu proje **MIT** lisansı ile lisanslanmıştır.
