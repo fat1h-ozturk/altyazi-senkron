@@ -40,38 +40,48 @@ pip install -e .
 
 ## 💻 Kullanım
 
-### 1. Video ile Altyazı Senkronizasyonu (En Yaygın)
+### 1. Toplu Dizi / Film Senkronizasyonu (`batch`)
+Bulunduğunuz klasördeki tüm video dosyalarını ve bunlara ait `.tr.srt` (veya `.srt`) altyazılarını otomatik olarak bulup tek seferde senkronize eder ve `.tr[synced].srt` olarak kaydeder:
+```bash
+# Bulunulan dizindeki tüm dizi bölümlerini tek seferde senkronla:
+altyazi-senkron batch
+
+# Farklı bir klasörü senkronla:
+altyazi-senkron batch /home/fatih/Videolar/Diziler/BreakingBad/
+```
+* **Otomatik Eşleşme:** `S01E01`, `1x01` gibi bölüm numaralarını ve dosya adlarını akıllıca eşleştirir.
+* **Akıllı Bellek Kullanımı:** Yapay zeka modeli her bölüm için tekrar tekrar yüklenmez; bellekte tutularak sıradaki bölümler çok daha hızlı işlenir.
+* **Kaldığı Yerden Devam:** Zaten `.tr[synced].srt` üretilmiş bölümleri otomatik atlar (yeniden işlemek için `--force` parametresi verilebilir).
+
+### 2. Tek Bir Video ile Altyazı Senkronizasyonu (`sync`)
 Videonuzdaki ses yapay zeka ile analiz edilir ve altyazı sıfır hata ile sese kenetlenir:
 ```bash
 altyazi-senkron sync film.mkv altyazi_tr.srt -o senkron_tr.srt
 ```
 
-### 2. Gömülü Altyazı Kısayolu (`--use-embedded`)
+### 3. Gömülü Altyazı Kısayolu (`--use-embedded`)
 Eğer videonuzda zaten orijinal dilde (örn. İngilizce) bir altyazı varsa, ses analizine hiç gerek kalmadan 2 saniyede Türkçe altyazıyı bu referansa kilitler:
 ```bash
 altyazi-senkron sync film.mkv altyazi_tr.srt --use-embedded -o senkron_tr.srt
 ```
 
-### 3. İki Altyazı Arası Senkronizasyon (Sub-to-Sub)
+### 4. İki Altyazı Arası Senkronizasyon (Sub-to-Sub)
 Elinizde videoya tam uyan bir İngilizce altyazı ve kaymış bir Türkçe altyazı varsa:
 ```bash
 altyazi-senkron sync uyumlu_en.srt kaymis_tr.srt -o duzeltilmis_tr.srt
 ```
 
-### 4. Model Boyutu ve Performans Seçenekleri
+### 5. Model Boyutu ve Performans Seçenekleri
 Whisper modelini donanımınıza göre belirleyebilirsiniz (`tiny`, `base`, `small`, `medium`):
 ```bash
 # Çok hızlı tarama (Hafif model):
-altyazi-senkron sync video.mp4 altyazi.srt -m tiny
+altyazi-senkron batch -m tiny
 
 # Yüksek hassasiyet (Varsayılan):
-altyazi-senkron sync video.mp4 altyazi.srt -m base
-
-# Maksimum hassasiyet:
-altyazi-senkron sync video.mp4 altyazi.srt -m small
+altyazi-senkron batch -m base
 ```
 
-### 5. Medya Bilgilerini İnceleme
+### 6. Medya Bilgilerini İnceleme
 Videodaki ses ve altyazı akışlarını listelemek için:
 ```bash
 altyazi-senkron info film.mkv

@@ -59,3 +59,11 @@ Türkçe satır dört.
     assert result.exit_code == 0
     assert output_file.exists()
     assert "Senkronizasyon Sonuç Raporu" in result.output
+
+
+def test_cli_batch_empty_dir(tmp_path: Path):
+    """Test batch command when no matching pairs are present in directory."""
+    result = runner.invoke(app, ["batch", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "dosyası bulunamadı" in result.output
+
