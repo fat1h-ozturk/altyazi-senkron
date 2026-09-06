@@ -109,23 +109,29 @@ ln -sf $(pwd)/.venv/bin/altyazi-senkron ~/.local/bin/altyazi-senkron
 
 Kurulum tamamlandıktan sonra terminali **istediğiniz klasörde** açıp doğrudan komutları çalıştırabilirsiniz.
 
-### 1. Toplu Dizi / Film Senkronizasyonu (`batch`)
-Bulunduğunuz klasördeki tüm video dosyalarını ve bunlara ait `.tr.srt` (veya `.srt`) altyazılarını otomatik tespit eder, sırayla senkronize eder ve `.tr[synced].srt` olarak kaydeder:
+### 1. Toplu Dizi / Film Senkronizasyonu (`batch` veya `.`)
+Bulunduğunuz klasördeki tüm video dosyalarını ve altyazıları otomatik tespit eder, sırayla senkronize eder ve `.<dil>[synced].srt` olarak kaydeder:
 
 ```bash
-# Bulunduğunuz klasördeki tüm bölümleri tek seferde senkronla:
-altyazi-senkron batch
+# Bulunduğunuz klasördeki Türkçe altyazıları tek komutla senkronla:
+altyazi-senkron .
+# (veya klasik komut: altyazi-senkron batch)
+
+# 🇬🇧 İNGİLİZCE ALTYAZILARI (.en.srt) TEK KOMUTLA SENKRONLA:
+altyazi-senkron . --sub en
+# (Çıktılar otomatik olarak Dizi.S01E01.en[synced].srt şeklinde üretilir)
+
+# İngilizce sesli bir dizide İngilizce altyazıları en yüksek doğrulukla senkronla:
+altyazi-senkron . --sub en --lang en
 
 # Dışarıdan başka bir klasörü senkronla:
-altyazi-senkron batch "D:\Diziler\The Walking Dead\Season 03"
-
-# Kaynak ses dilini belirterek daha hızlı ve kesin sonuç al:
-altyazi-senkron batch --lang en
+altyazi-senkron "D:\Diziler\The Walking Dead\Season 03" --sub en
 ```
 
+* **Çok Dilli Altyazı Desteği (`--sub`):** Klasörde hem `.tr.srt` hem `.en.srt` olsa bile `--sub en` diyerek sadece İngilizce altyazıları hedefleyebilirsiniz.
 * **Gelişmiş Bölüm Eşleştirme:** `S01E01`, `1x01` ve çift bölümlü `S01E01-E02` / `1x01-02` dosyalarını kusursuz eşleştirir.
 * **Akıllı Model Önbelleği:** Yapay zeka modeli her bölüm için tekrar tekrar yüklenmez; bellekte tutulur ve sonraki bölümler çok daha hızlı işlenir.
-* **Kaldığı Yerden Devam:** Zaten `.tr[synced].srt` üretilmiş olan dosyalar otomatik atlanır (tekrar işlemek için `--force` eklenebilir).
+* **Kaldığı Yerden Devam:** Zaten `[synced].srt` üretilmiş olan dosyalar otomatik atlanır (tekrar işlemek için `--force` eklenebilir).
 
 ---
 
@@ -177,12 +183,13 @@ altyazi-senkron info film.mkv
 | Parametre | Komut | Açıklama |
 | :--- | :--- | :--- |
 | `-m, --model` | `sync`, `batch` | Whisper model boyutu: `tiny`, `base`, `small`, `medium` *(Varsayılan: `base`, zorlu sesler için `small` önerilir)* |
+| `--sub-lang, --sub` | `batch` | Senkronlanacak hedef altyazı dili (örn: `tr`, `en`, `de` veya tümü için `all`). *(Varsayılan: `tr`)* |
 | `--lang` | `sync`, `batch` | Kaynak videonun ses dili (örn: `en`, `tr`, `de`, `fr`). Otomatik tespiti atlar, hız ve doğruluğu artırır. |
 | `--vad-silence` | `sync`, `batch` | İki konuşma arası minimum sessizlik eşiği (ms) *(Varsayılan: `300`). Hızlı konuşmalar için `150-200` önerilir.* |
 | `-d, --device` | `sync`, `batch` | Donanım birimi: `cpu`, `cuda` veya `auto` *(Varsayılan: `auto`)* |
 | `--use-embedded` | `sync`, `batch` | Varsa videodaki gömülü altyazıyı referans alarak ses analizini atlar. |
 | `--no-snap` | `sync`, `batch` | Milisaniyelik diyalog kenetlemesini (snapping) devre dışı bırakır. |
-| `-f, --force` | `batch` | Zaten `.tr[synced].srt` olsa bile dosyayı tekrar senkronlar. |
+| `-f, --force` | `batch` | Zaten `[synced].srt` olsa bile dosyayı tekrar senkronlar. |
 | `-r, --recursive` | `batch` | Alt klasörleri de tarar. |
 | `-t, --threads` | `sync`, `batch` | Kullanılacak CPU iş parçacığı sayısı *(Varsayılan: sistem çekirdekleri)* |
 | `-o, --output` | `sync` | Özel çıktı dosyası yolu *(Varsayılan: `<hedef>_synced.srt`)* |
@@ -191,7 +198,7 @@ altyazi-senkron info film.mkv
 
 ## 🧪 Testleri Çalıştırma
 
-Proje 17 adet kapsamlı birim ve uçtan uca entegrasyon testi ile korunmaktadır:
+Proje 18 adet kapsamlı birim ve uçtan uca entegrasyon testi ile korunmaktadır:
 ```bash
 pytest -v
 ```
