@@ -50,7 +50,7 @@ Aracın videolardan ses analizi yapabilmesi için sisteminizde **FFmpeg** ve **P
 
 Projeyi bilgisayarınıza klonlayın:
 ```bash
-git clone https://github.com/KULLANICI_ADINIZ/altyazi-senkron.git
+git clone https://github.com/fatihozturk-1/altyazi-senkron.git
 cd altyazi-senkron
 ```
 
@@ -182,5 +182,3 @@ pytest -v
 
 ---
 
-## 📄 Lisans
-Bu proje **MIT** lisansı ile lisanslanmıştır.
