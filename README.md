@@ -1,6 +1,6 @@
 # altyazi-senkron
 
-**altyazi-senkron**, `ffsubsync` ve `alass-cli` gibi geleneksel araçların sıklıkla başarısız olduğu, anlamsız kaymalar yaptığı ve müzik/patlama seslerine takıldığı senaryoları çözmek için geliştirilmiş **yeni nesil, AI destekli ve yüksek hassasiyetli altyazı senkronizasyon aracıdır.
+**altyazi-senkron**, `ffsubsync` ve `alass-cli` gibi geleneksel araçların sıklıkla başarısız olduğu, anlamsız kaymalar yaptığı ve müzik/patlama seslerine takıldığı senaryoları çözmek için geliştirilmiş **yeni nesil, AI destekli ve yüksek hassasiyetli altyazı senkronizasyon aracıdır**.
 
 ---
 
@@ -8,12 +8,13 @@
 
 | Problem | ffsubsync / alass | altyazi-senkron |
 | :--- | :--- | :--- |
-| **Gürültü & Müzik Yanılgısı** | WebRTC VAD müzik ve patlamaları "ses" sanır; yanlış sahneye kilitlenir. | **Faster-Whisper + Silero VAD** sadece gerçek insan konuşmalarını ayıklar, gürültüyü tamamen eler. |
-| **Rastgele / Alakasız Kaymalar** | Çapraz korelasyon yerel tepe noktalarına takılıp altyazıyı $\pm 100$ sn kaydırabilir. | **RANSAC + Konuşma Parmak İzi (Fingerprinting)** ile aykırı değerler dışlanır, matematiksel küresel uyum bulunur. |
-| **FPS / Hız Farkı (Drift)** | 23.976 $\leftrightarrow$ 25 FPS dönüşümlerinde zamanla açılma yaşanabilir. | Standart film/video kare hızlarını otomatik dener ve en küçük sapmayı hesaplar. |
-| **Parçalı Kesintiler (Piecewise)** | TV reklam araları veya kesilmiş sahnelerde zincirleme olarak dağılır. | **Değişim noktası analizi (Change-point)** ile filmi parçalara ayırarak çözer. |
-| **Milisaniyelik Uyum (Snapping)** | Altyazı kabaca oturur fakat diyalog başlangıcına tam kenetlenmez. | **Snapper Motoru** ile altyazı başlangıç ve bitişini konuşma sınırına kilitler. |
-| **Doğrulama ve Güven Skoru** | Hatalı çıksa bile kullanıcıya bildirmeden yanlış dosyayı kaydeder. | İşlem sonunda Güven Skoru ve örtüşme raporu sunar. |
+| **Gürültü & Müzik Yanılgısı** | WebRTC VAD müzik ve patlamaları "ses" sanır; yanlış sahneye kilitlenir. | **Faster-Whisper + Silero VAD + `no_speech_prob` filtresi** ile sahte sesler elenir, yalnızca gerçek diyaloglar referans alınır. |
+| **Rastgele / Alakasız Kaymalar** | Çapraz korelasyon yerel tepe noktalarına takılıp altyazıyı $\pm 100$ sn kaydırabilir. | **RANSAC + Konuşma Ritim Analizi (Fingerprinting)** ile aykırı değerler dışlanır, matematiksel küresel uyum bulunur. |
+| **FPS / Hız Farkı (Drift)** | 23.976 $\leftrightarrow$ 25 FPS gibi dönüşümlerde zamanla açılma yaşanır. | 23.976, 24, 25 (PAL), 29.97 (NTSC), 30 FPS arası tüm standart dönüşüm oranlarını otomatik dener (0.79x – 1.26x). |
+| **Çoklu Reklam Araları / Kesintiler** | TV yayınlarında reklam aralarından sonra zincirleme olarak senkron dağılır. | **Rekürsif Değişim Noktası Analizi (Recursive Multi-cut)** ile 1, 2 veya 3 reklam arası içeren bölümleri parçalara ayırarak çözer. |
+| **Milisaniyelik Uyum (Snapping)** | Altyazı kabaca oturur fakat dudak hareketlerine tam kenetlenmez. | **$O(\log N)$ Snapper Motoru** ile altyazı başlangıç ve bitişini milisaniyelik hassasiyetle konuşma sınırlarına kilitler. |
+| **Çift / Çoklu Bölüm Desteği** | `S01E01-E02` gibi yayınları tanıyamaz veya yanlış eşleştirir. | Özel Regex motoru `S01E01-E02`, `1x01-02`, `Ep01` gibi tüm kalıpları çözer. |
+| **Doğrulama ve Güven Skoru** | Hatalı çıksa bile kullanıcıya bildirmeden yanlış dosyayı kaydeder. | İşlem sonunda örtüşme yüzdesi, güven skoru ve net durum raporu sunar. |
 
 ---
 
@@ -117,9 +118,12 @@ altyazi-senkron batch
 
 # Dışarıdan başka bir klasörü senkronla:
 altyazi-senkron batch "D:\Diziler\The Walking Dead\Season 03"
+
+# Kaynak ses dilini belirterek daha hızlı ve kesin sonuç al:
+altyazi-senkron batch --lang en
 ```
 
-* **Otomatik Eşleşme:** `S01E01`, `1x01` gibi bölüm numaralarını akıllıca eşleştirir.
+* **Gelişmiş Bölüm Eşleştirme:** `S01E01`, `1x01` ve çift bölümlü `S01E01-E02` / `1x01-02` dosyalarını kusursuz eşleştirir.
 * **Akıllı Model Önbelleği:** Yapay zeka modeli her bölüm için tekrar tekrar yüklenmez; bellekte tutulur ve sonraki bölümler çok daha hızlı işlenir.
 * **Kaldığı Yerden Devam:** Zaten `.tr[synced].srt` üretilmiş olan dosyalar otomatik atlanır (tekrar işlemek için `--force` eklenebilir).
 
@@ -129,6 +133,15 @@ altyazi-senkron batch "D:\Diziler\The Walking Dead\Season 03"
 Belirli bir video ve altyazıyı senkronize etmek için:
 ```bash
 altyazi-senkron sync film.mkv altyazi_tr.srt -o senkron_tr.srt
+```
+
+#### 💡 İpucu: En Yüksek Hassasiyet İçin Parametreler
+```bash
+# İngilizce sesli bir film için dil ipucu ve daha büyük model:
+altyazi-senkron sync film.mkv altyazi_tr.srt --lang en --model small
+
+# Hızlı konuşulan dizilerde diyalog ayrımını hassaslaştırmak için:
+altyazi-senkron sync dizi.mkv altyazi_tr.srt --vad-silence 150
 ```
 
 ---
@@ -144,7 +157,7 @@ altyazi-senkron batch --use-embedded
 ---
 
 ### 4. İki Altyazı Arası Senkronizasyon (Sub-to-Sub)
-Elinizde videoyla tam uyumlu bir yabancı altyazı ve kaymış bir Türkçe altyazı varsa:
+Elinizde videoyla tam uyumlu bir yabancı altyazı ve kaymış bir Türkçe altyazı varsa ses analizine gerek kalmadan doğrudan senkronlayabilirsiniz:
 ```bash
 altyazi-senkron sync ingilizce.srt turkce.srt -o duzeltilmis_turkce.srt
 ```
@@ -161,21 +174,24 @@ altyazi-senkron info film.mkv
 
 ## ⚙️ Parametreler ve Seçenekler
 
-| Parametre | Açıklama |
-| :--- | :--- |
-| `-m, --model` | Whisper model boyutu: `tiny`, `base`, `small`, `medium` *(Varsayılan: `base`)* |
-| `-d, --device` | Donanım birimi: `cpu`, `cuda` veya `auto` *(Varsayılan: `auto`)* |
-| `--use-embedded` | Varsa videodaki gömülü altyazıyı referans alarak ses analizini atlar. |
-| `--no-snap` | Milisaniyelik diyalog kenetlemesini (snapping) devre dışı bırakır. |
-| `-f, --force` | *(batch)* Zaten `.tr[synced].srt` olsa bile tekrar senkronlar. |
-| `-r, --recursive` | *(batch)* Alt klasörleri de tarar. |
-| `-t, --threads` | Kullanılacak CPU iş parçacığı sayısı *(Varsayılan: sistem çekirdekleri)* |
+| Parametre | Komut | Açıklama |
+| :--- | :--- | :--- |
+| `-m, --model` | `sync`, `batch` | Whisper model boyutu: `tiny`, `base`, `small`, `medium` *(Varsayılan: `base`, zorlu sesler için `small` önerilir)* |
+| `--lang` | `sync`, `batch` | Kaynak videonun ses dili (örn: `en`, `tr`, `de`, `fr`). Otomatik tespiti atlar, hız ve doğruluğu artırır. |
+| `--vad-silence` | `sync`, `batch` | İki konuşma arası minimum sessizlik eşiği (ms) *(Varsayılan: `300`). Hızlı konuşmalar için `150-200` önerilir.* |
+| `-d, --device` | `sync`, `batch` | Donanım birimi: `cpu`, `cuda` veya `auto` *(Varsayılan: `auto`)* |
+| `--use-embedded` | `sync`, `batch` | Varsa videodaki gömülü altyazıyı referans alarak ses analizini atlar. |
+| `--no-snap` | `sync`, `batch` | Milisaniyelik diyalog kenetlemesini (snapping) devre dışı bırakır. |
+| `-f, --force` | `batch` | Zaten `.tr[synced].srt` olsa bile dosyayı tekrar senkronlar. |
+| `-r, --recursive` | `batch` | Alt klasörleri de tarar. |
+| `-t, --threads` | `sync`, `batch` | Kullanılacak CPU iş parçacığı sayısı *(Varsayılan: sistem çekirdekleri)* |
+| `-o, --output` | `sync` | Özel çıktı dosyası yolu *(Varsayılan: `<hedef>_synced.srt`)* |
 
 ---
 
 ## 🧪 Testleri Çalıştırma
 
-Geliştiriciler için birim ve entegrasyon testleri:
+Proje 17 adet kapsamlı birim ve uçtan uca entegrasyon testi ile korunmaktadır:
 ```bash
 pytest -v
 ```
