@@ -56,6 +56,8 @@ def process_single_sync(
     threads: int = 4,
     show_details: bool = True,
     progress_prefix: str = "",
+    language: Optional[str] = None,
+    vad_min_silence: int = 300,
 ) -> Tuple[bool, Optional[AlignmentResult], Optional[Dict[str, Any]], str]:
     """
     Executes synchronization for a single video/subtitle pair.
@@ -144,6 +146,8 @@ def process_single_sync(
 
                     speech_segments = detector.detect_segments(
                         wav_path,
+                        language=language,
+                        vad_min_silence_ms=vad_min_silence,
                         progress_callback=update_progress,
                     )
                     progress.update(task, completed=100.0)
@@ -241,6 +245,16 @@ def sync_command(
         "-t", "--threads",
         help="CPU iş parçacığı (threads) sayısı.",
     ),
+    language: Optional[str] = typer.Option(
+        None,
+        "--lang",
+        help="Kaynak videonun ses dili (örn: tr, en, de). Boş bırakılırsa Whisper otomatik algılar.",
+    ),
+    vad_silence: int = typer.Option(
+        300,
+        "--vad-silence",
+        help="VAD: iki konuşma arasındaki minimum sessizlik süresi (ms). Küçük değer = daha fazla segment.",
+    ),
 ):
     """
     Tek bir hedef altyazıyı video, ses veya referans altyazı ile senkronize eder.
@@ -265,6 +279,8 @@ def sync_command(
         use_embedded=use_embedded,
         threads=threads,
         show_details=True,
+        language=language,
+        vad_min_silence=vad_silence,
     )
 
     if not success:
@@ -344,6 +360,16 @@ def batch_command(
         "-t", "--threads",
         help="CPU iş parçacığı sayısı.",
     ),
+    language: Optional[str] = typer.Option(
+        None,
+        "--lang",
+        help="Kaynak videonun ses dili (örn: tr, en, de). Boş bırakılırsa Whisper otomatik algılar.",
+    ),
+    vad_silence: int = typer.Option(
+        300,
+        "--vad-silence",
+        help="VAD: iki konuşma arasındaki minimum sessizlik süresi (ms).",
+    ),
 ):
     r"""
     Dizindeki tüm videoları ve bunlara ait .tr.srt dosyalarını bulup
@@ -417,6 +443,8 @@ def batch_command(
             threads=threads,
             show_details=False,
             progress_prefix=prefix,
+            language=language,
+            vad_min_silence=vad_silence,
         )
 
         if success:

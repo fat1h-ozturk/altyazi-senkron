@@ -20,12 +20,18 @@ class SubtitleMatcher:
         23.976024 / 24.0,       # ~0.99900
         25.0 / 24.0,            # ~1.04167
         24.0 / 25.0,            # ~0.96000
+        30.0 / 25.0,            # ~1.20000 (PAL -> 30fps)
+        25.0 / 30.0,            # ~0.83333
+        29.97002997 / 25.0,     # ~1.19880 (PAL -> NTSC)
+        25.0 / 29.97002997,     # ~0.83472
+        29.97002997 / 24.0,     # ~1.24875 (24fps -> NTSC)
+        24.0 / 29.97002997,     # ~0.80080
     ]
 
     def __init__(
         self,
-        min_speed: float = 0.93,
-        max_speed: float = 1.07,
+        min_speed: float = 0.79,   # widened to cover 24/29.97
+        max_speed: float = 1.22,   # widened to cover 30/25
         inlier_tolerance: float = 0.40,  # Max distance in seconds to consider an inlier
     ):
         self.min_speed = min_speed
