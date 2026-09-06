@@ -59,3 +59,17 @@ def test_find_video_subtitle_pairs(tmp_path: Path):
     ep2_pair = [p for p in pairs if "S01E02" in p[0].name][0]
     assert ep2_pair[1].name == "Series.S01E02.1080p.tr.srt"
     assert ep2_pair[2].name == "Series.S01E02.1080p.tr[synced].srt"
+
+
+def test_english_subtitles_matching(tmp_path: Path):
+    """Test pairing and output naming when target subtitle language is English."""
+    (tmp_path / "Show.S01E01.1080p.mkv").touch()
+    (tmp_path / "Show.S01E01.tr.srt").touch()
+    (tmp_path / "Show.S01E01.en.srt").touch()
+
+    # When sub_lang="en", it should pick the .en.srt file and output .en[synced].srt
+    pairs = find_video_subtitle_pairs(tmp_path, sub_lang="en")
+    assert len(pairs) == 1
+    v, s, o = pairs[0]
+    assert s.name == "Show.S01E01.en.srt"
+    assert o.name == "Show.S01E01.1080p.en[synced].srt"

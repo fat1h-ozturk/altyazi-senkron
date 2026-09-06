@@ -39,35 +39,63 @@ def extract_episode_id(filename: str) -> Optional[str]:
     return None
 
 
-def get_synced_output_path(video_path: Path, subtitle_path: Path) -> Path:
+def extract_subtitle_lang_tag(subtitle_path: Path) -> Optional[str]:
     """
-    Generates the output path ending with .tr[synced].srt
+    Extracts language code tag from subtitle filename if present.
+    Examples:
+        'Series.S01E01.en.srt'  -> 'en'
+        'Series.S01E01.eng.srt' -> 'eng'
+        'Series.S01E01.tr.srt'  -> 'tr'
+        'Movie.srt'             -> None
     """
-    # Use the video file stem as the base name
-    base_name = video_path.stem
-    # Strip trailing ".tr" (case-insensitive) to avoid .tr.tr[synced].srt
-    if base_name.lower().endswith(".tr"):
-        base_name = base_name[:-3]
-    # Also strip any trailing dots left after the removal above
-    base_name = base_name.rstrip(".")
+    stem = subtitle_path.stem.lower()
+    parts = stem.split(".")
+    if len(parts) >= 2:
+        candidate = parts[-1]
+        if re.match(r"^[a-z]{2,3}$", candidate):
+            return candidate
+    return None
 
-    return video_path.parent / f"{base_name}.tr[synced].srt"
+
+def get_synced_output_path(
+    video_path: Path,
+    subtitle_path: Path,
+    sub_lang: Optional[str] = None,
+) -> Path:
+    """
+    Generates the output path ending with .<lang>[synced].srt (e.g. .en[synced].srt, .tr[synced].srt)
+    """
+    base_name = video_path.stem
+
+    # Determine which language tag to use
+    if sub_lang and sub_lang.lower() != "all":
+        tag = sub_lang.lower()
+    else:
+        detected_tag = extract_subtitle_lang_tag(subtitle_path)
+        tag = detected_tag if detected_tag else "tr"
+
+    # Strip existing language suffixes from base_name to avoid Dizi.S01E01.en.en[synced].srt
+    for possible_tag in [tag, "tr", "tur", "en", "eng", "de", "ger", "fr", "fra", "es", "spa", "it", "ita"]:
+        if base_name.lower().endswith(f".{possible_tag}"):
+            base_name = base_name[: -(len(possible_tag) + 1)]
+
+    base_name = base_name.rstrip(".")
+    return video_path.parent / f"{base_name}.{tag}[synced].srt"
 
 
 def find_video_subtitle_pairs(
     directory: Path,
-    recursive: bool = False
+    sub_lang: str = "tr",
+    recursive: bool = False,
 ) -> List[Tuple[Path, Path, Path]]:
     """
-    Scans directory and pairs each video file with its matching Turkish subtitle file.
+    Scans directory and pairs each video file with its matching subtitle file for the requested language.
     
-    Priority order for matching:
-    1. <video_stem>.tr.srt
-    2. <video_stem>.srt
-    3. Any .tr.srt matching episode identifier (e.g. S01E02)
-    4. Any .srt matching episode identifier
-    5. Subtitle containing video stem prefix
-    
+    Args:
+        directory: Directory to search
+        sub_lang: Target subtitle language code (e.g. 'tr', 'en', 'de', or 'all'). Default 'tr'.
+        recursive: Whether to search subdirectories recursively.
+
     Returns:
         List of (video_path, target_subtitle_path, output_path)
     """
@@ -98,6 +126,16 @@ def find_video_subtitle_pairs(
     # Sort videos alphabetically
     video_files.sort(key=lambda x: str(x).lower())
 
+    lang_lower = sub_lang.lower() if sub_lang else "tr"
+    if lang_lower == "en":
+        target_aliases = ["en", "eng"]
+    elif lang_lower == "tr":
+        target_aliases = ["tr", "tur"]
+    elif lang_lower == "all":
+        target_aliases = []
+    else:
+        target_aliases = [lang_lower]
+
     for video in video_files:
         v_stem = video.stem.lower()
         v_dir = video.parent
@@ -105,51 +143,72 @@ def find_video_subtitle_pairs(
 
         matched_sub: Optional[Path] = None
 
-        # Filter candidate subtitles in the same folder or overall
         subs_in_dir = [
             s for s in candidate_subtitles
             if s.parent == v_dir and s not in used_subtitles
         ]
 
-        # 1. Exact match with .tr.srt
-        for s in subs_in_dir:
-            if s.name.lower() == f"{v_stem}.tr.srt":
-                matched_sub = s
-                break
+        # 1. Exact match with .{alias}.srt (e.g. Video.en.srt)
+        if target_aliases:
+            for s in subs_in_dir:
+                for alias in target_aliases:
+                    if s.name.lower() == f"{v_stem}.{alias}.srt":
+                        matched_sub = s
+                        break
+                if matched_sub:
+                    break
 
-        # 2. Exact match with .srt
+        # 2. Exact match with .srt (e.g. Video.srt)
         if not matched_sub:
             for s in subs_in_dir:
                 if s.stem.lower() == v_stem:
                     matched_sub = s
                     break
 
-        # 3. Episode ID match with .tr.srt
+        # 3. Episode ID match with matching language tag (e.g. Series.S01E01.en.srt)
         if not matched_sub and v_ep:
             for s in subs_in_dir:
-                s_name = s.name.lower()
-                if ".tr." in s_name or s_name.endswith(".tr.srt"):
-                    if extract_episode_id(s.name) == v_ep:
+                s_ep = extract_episode_id(s.name)
+                if s_ep == v_ep:
+                    s_tag = extract_subtitle_lang_tag(s)
+                    if not target_aliases or (s_tag and s_tag in target_aliases):
                         matched_sub = s
                         break
 
-        # 4. Episode ID match with any .srt
+        # 4. Episode ID match with any .srt (only if no conflicting different language tag)
         if not matched_sub and v_ep:
             for s in subs_in_dir:
                 if extract_episode_id(s.name) == v_ep:
+                    s_tag = extract_subtitle_lang_tag(s)
+                    if target_aliases and s_tag and s_tag not in target_aliases:
+                        continue
                     matched_sub = s
                     break
 
-        # 5. Subtitle containing video stem prefix and '.tr.'
+        # 5. Subtitle containing video stem prefix and language alias
+        if not matched_sub and target_aliases:
+            for s in subs_in_dir:
+                s_name = s.name.lower()
+                for alias in target_aliases:
+                    if f".{alias}." in s_name and (v_stem in s_name or s.stem.lower() in v_stem):
+                        matched_sub = s
+                        break
+                if matched_sub:
+                    break
+
+        # 6. Fallback: subtitle containing video stem
         if not matched_sub:
             for s in subs_in_dir:
                 s_name = s.name.lower()
-                if ".tr." in s_name and (v_stem in s_name or s.stem.lower() in v_stem):
+                if v_stem in s_name or s.stem.lower() in v_stem:
+                    s_tag = extract_subtitle_lang_tag(s)
+                    if target_aliases and s_tag and s_tag not in target_aliases:
+                        continue
                     matched_sub = s
                     break
 
         if matched_sub:
-            output_path = get_synced_output_path(video, matched_sub)
+            output_path = get_synced_output_path(video, matched_sub, sub_lang=sub_lang)
             pairs.append((video, matched_sub, output_path))
             used_subtitles.add(matched_sub)
 

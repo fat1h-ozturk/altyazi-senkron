@@ -360,6 +360,11 @@ def batch_command(
         "-t", "--threads",
         help="CPU iş parçacığı sayısı.",
     ),
+    sub_lang: str = typer.Option(
+        "tr",
+        "--sub-lang", "--sub",
+        help="Senkronlanacak altyazı dili (örn: tr, en, de veya tümü için 'all'). Varsayılan: tr",
+    ),
     language: Optional[str] = typer.Option(
         None,
         "--lang",
@@ -372,8 +377,8 @@ def batch_command(
     ),
 ):
     r"""
-    Dizindeki tüm videoları ve bunlara ait .tr.srt dosyalarını bulup
-    tek seferde senkronize ederek .tr\[synced\].srt formatında kaydeder.
+    Dizindeki tüm videoları ve bunlara ait altyazıları (.tr.srt, .en.srt vb.) bulup
+    tek seferde senkronize ederek .<dil>\[synced\].srt formatında kaydeder.
     """
     console.print(
         Panel.fit(
@@ -383,10 +388,10 @@ def batch_command(
     )
 
     directory = directory.resolve()
-    pairs = find_video_subtitle_pairs(directory, recursive=recursive)
+    pairs = find_video_subtitle_pairs(directory, sub_lang=sub_lang, recursive=recursive)
 
     if not pairs:
-        console.print(f"[bold yellow]Uyarı:[/bold yellow] [underline]{directory}[/underline] dizininde eşleşen video ve .srt/.tr.srt dosyası bulunamadı.")
+        console.print(f"[bold yellow]Uyarı:[/bold yellow] [underline]{directory}[/underline] dizininde eşleşen video ve .{sub_lang}.srt / .srt dosyası bulunamadı.")
         raise typer.Exit(code=0)
 
     console.print(f"[green]✔[/green] Toplam [bold]{len(pairs)}[/bold] adet video-altyazı eşleşmesi bulundu:\n")
@@ -395,8 +400,8 @@ def batch_command(
     pair_table = Table(show_header=True, header_style="bold cyan")
     pair_table.add_column("#", width=4)
     pair_table.add_column("Video Dosyası")
-    pair_table.add_column("Kaynak Altyazı (.tr.srt)")
-    pair_table.add_column(escape("Hedef Çıktı (.tr[synced].srt)"))
+    pair_table.add_column(f"Kaynak Altyazı (.{sub_lang}.srt)")
+    pair_table.add_column(escape(f"Hedef Çıktı (.{sub_lang}[synced].srt)"))
     pair_table.add_column("Durum", width=12)
 
     to_process: List[Tuple[Path, Path, Path]] = []
@@ -412,7 +417,7 @@ def batch_command(
     console.print(pair_table)
 
     if not to_process:
-        console.print(f"\n[bold green]Tüm dosyalar zaten senkronize edilmiş ({escape('.tr[synced].srt')} mevcut).[/bold green] Yeniden senkronlamak için [bold]--force[/bold] kullanabilirsiniz.")
+        console.print(f"\n[bold green]Tüm dosyalar zaten senkronize edilmiş ({escape(f'.{sub_lang}[synced].srt')} mevcut).[/bold green] Yeniden senkronlamak için [bold]--force[/bold] kullanabilirsiniz.")
         raise typer.Exit(code=0)
 
     console.print(f"\n[bold cyan]Senkronize edilecek {len(to_process)} dosya işleniyor...[/bold cyan]\n")
@@ -513,6 +518,17 @@ def info_command(
 
 
 def main():
+    import sys
+    # Ergonomic shortcut: if user runs `altyazi-senkron .` or `altyazi-senkron <dir>`,
+    # automatically route to `batch` command!
+    if len(sys.argv) > 1:
+        first_arg = sys.argv[1]
+        if first_arg == "." or (
+            not first_arg.startswith("-")
+            and first_arg not in ["sync", "batch", "info"]
+            and Path(first_arg).is_dir()
+        ):
+            sys.argv.insert(1, "batch")
     app()
 
 
