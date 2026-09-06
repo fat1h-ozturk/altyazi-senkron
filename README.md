@@ -19,21 +19,50 @@
 
 ## 🚀 Kurulum
 
-### Gereksinimler
-- **Python:** >= 3.9
-- **FFmpeg & FFprobe:** Sisteminizde kurulu olmalıdır (`sudo dnf install ffmpeg` veya `sudo apt install ffmpeg`).
+### 1. Ön Gereksinim: FFmpeg
+Aracın video dosyalarından ses analizi yapabilmesi için sisteminizde `ffmpeg` kurulu olmalıdır:
+* **Ubuntu / Debian:** `sudo apt install ffmpeg`
+* **Fedora / RHEL:** `sudo dnf install ffmpeg`
+* **Arch Linux:** `sudo pacman -S ffmpeg`
+* **macOS:** `brew install ffmpeg`
+* **Windows:** `winget install Gyan.FFmpeg`
 
-### Sanal Ortam ve Kurulum
+---
+
+### 2. Kurulum Yöntemleri
+
+Repoyu klonlayın:
 ```bash
-git clone https://github.com/fatih/altyazi-senkron.git
+git clone https://github.com/KULLANICI_ADINIZ/altyazi-senkron.git
 cd altyazi-senkron
+```
 
+İstediğiniz kurulum yöntemini seçin:
+
+#### Yöntem A: Otomatik Kurulum Scripti (En Kolay)
+Linux ve macOS için tek komutla her şeyi (sanal ortam, paketler ve global kısayol) otomatik kurar:
+```bash
+./install.sh
+```
+
+#### Yöntem B: pipx ile Kurulum (Önerilen CLI Standardı)
+Sisteminizde `pipx` varsa, bağımsız ve global bir araç olarak kurar:
+```bash
+pipx install .
+```
+
+#### Yöntem C: Standart Python venv ile Kurulum
+```bash
 # Sanal ortam oluşturup aktifleştirin
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Paketleri kurun
+# Paketi kurun
 pip install -e .
+
+# (İsteğe bağlı) Her dizinden çalıştırabilmek için kısayol ekleyin:
+mkdir -p ~/.local/bin
+ln -sf $(pwd)/.venv/bin/altyazi-senkron ~/.local/bin/altyazi-senkron
 ```
 
 ---
