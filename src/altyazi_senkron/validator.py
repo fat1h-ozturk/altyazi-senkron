@@ -44,7 +44,7 @@ class AlignmentValidator:
             status = "EXCELLENT"
         elif matched_ratio >= 0.70 and confidence_pct >= 60.0:
             status = "GOOD"
-        elif matched_ratio >= 0.50:
+        elif matched_ratio >= 0.50 and confidence_pct >= 40.0:
             status = "ACCEPTABLE"
         else:
             status = "UNCERTAIN"

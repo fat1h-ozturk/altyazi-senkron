@@ -1,3 +1,4 @@
+import bisect
 from typing import List
 from .models import SubtitleItem, SpeechSegment, AlignmentSegment
 
@@ -32,8 +33,9 @@ class SubtitleSnapper:
 
         snapped_items: List[SubtitleItem] = []
 
-        # Sort speech segments by start time
+        # Sort speech segments by start time and extract sorted starts for binary search
         speech_sorted = sorted(speech_segments, key=lambda s: s.start)
+        speech_starts = [s.start for s in speech_sorted]
 
         for sub in subtitles:
             # 1. Apply applicable alignment segment
@@ -46,29 +48,34 @@ class SubtitleSnapper:
             new_start = seg.apply(sub.start)
             new_end = seg.apply(sub.end)
 
-            # 2. Find closest speech onset within snap_window
+            # 2. Find closest speech onset within snap_window using binary search
             best_start_snap = new_start
             min_start_diff = self.snap_window
 
-            for sp in speech_sorted:
+            start_idx = bisect.bisect_left(speech_starts, new_start - self.snap_window)
+            for i in range(start_idx, len(speech_sorted)):
+                sp = speech_sorted[i]
+                if sp.start > new_start + self.snap_window:
+                    break
                 diff = abs(sp.start - new_start)
                 if diff < min_start_diff:
                     min_start_diff = diff
                     best_start_snap = sp.start
-                if sp.start > new_start + self.snap_window:
-                    break
 
             # 3. Find closest speech offset within snap_window
             best_end_snap = new_end
             min_end_diff = self.snap_window
 
-            for sp in speech_sorted:
+            # Speech segments starting within 20s before new_end could have their end near new_end
+            end_idx = bisect.bisect_left(speech_starts, max(0.0, new_end - self.snap_window - 20.0))
+            for i in range(end_idx, len(speech_sorted)):
+                sp = speech_sorted[i]
+                if sp.start > new_end + self.snap_window:
+                    break
                 diff = abs(sp.end - new_end)
                 if diff < min_end_diff:
                     min_end_diff = diff
                     best_end_snap = sp.end
-                if sp.start > new_end + self.snap_window:
-                    break
 
             # Ensure start < end and respect minimum duration
             final_start = max(0.0, best_start_snap)

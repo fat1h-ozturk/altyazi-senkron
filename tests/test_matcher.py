@@ -145,3 +145,58 @@ def test_piecewise_cut_detection():
     assert len(result.segments) == 2
     assert abs(result.segments[0].offset - offset1) < 0.250
     assert abs(result.segments[1].offset - offset2) < 0.250
+
+
+def test_multiple_piecewise_cuts():
+    """Test detecting multiple commercial breaks (3 segments / 2 cuts)."""
+    subtitles = generate_dialogues(90)
+
+    offset1 = 2.000
+    offset2 = 30.000  # Cut 1: +28s
+    offset3 = 65.000  # Cut 2: +35s
+
+    speech_segments = []
+    for i, s in enumerate(subtitles):
+        if i < 30:
+            off = offset1
+        elif i < 60:
+            off = offset2
+        else:
+            off = offset3
+        speech_segments.append(
+            SpeechSegment(start=s.start + off, end=s.end + off)
+        )
+
+    speech_segments.sort(key=lambda x: x.start)
+
+    matcher = SubtitleMatcher()
+    result = matcher.align(subtitles, speech_segments)
+
+    assert result.is_piecewise is True
+    assert len(result.segments) == 3
+    assert abs(result.segments[0].offset - offset1) < 0.350
+    assert abs(result.segments[1].offset - offset2) < 0.350
+    assert abs(result.segments[2].offset - offset3) < 0.350
+
+
+def test_ntsc_29_97_speed_recovery():
+    """Test detecting 29.97 / 24.0 fps ratio (~1.24875x) without boundary clipping."""
+    subtitles = generate_dialogues(50)
+    true_speed = 29.97002997 / 24.0
+    true_offset = 3.500
+
+    speech_segments = []
+    for s in subtitles:
+        mapped_start = true_speed * s.start + true_offset
+        mapped_end = true_speed * s.end + true_offset
+        speech_segments.append(
+            SpeechSegment(start=mapped_start, end=mapped_end, text=s.text)
+        )
+
+    speech_segments.sort(key=lambda x: x.start)
+
+    matcher = SubtitleMatcher()
+    result = matcher.align(subtitles, speech_segments)
+
+    assert abs(result.detected_speed - true_speed) < 0.01
+    assert abs(result.detected_offset - true_offset) < 0.250

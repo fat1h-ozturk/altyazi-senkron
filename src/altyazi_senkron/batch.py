@@ -7,20 +7,31 @@ VIDEO_EXTENSIONS: Set[str] = {
 }
 
 _EPISODE_REGEXES = [
-    re.compile(r"(?<![a-zA-Z0-9])[sS](\d{1,2})[eE](\d{1,2})(?![a-zA-Z0-9])"),        # S01E02, s1e2
-    re.compile(r"(?<![a-zA-Z0-9])(\d{1,2})[xX](\d{1,2})(?![a-zA-Z0-9])"),            # 1x02, 01x02
-    re.compile(r"(?<![a-zA-Z0-9])[eE][pP]\.?\s*(\d{1,3})(?![a-zA-Z0-9])"),           # Ep02, EP.02, ep2
-    re.compile(r"(?<![a-zA-Z0-9])[eE](\d{1,3})(?![a-zA-Z0-9])"),                     # E02, e02
+    # Multi-episode: S01E01-E02, S01E01-02, S01E01E02
+    re.compile(r"(?<![a-zA-Z0-9])[sS](\d{1,2})[eE](\d{1,2})(?:[-_.]?[eE]|[-_.])(\d{1,2})(?![a-zA-Z0-9])"),
+    # Multi-episode: 1x01-02, 01x01-02
+    re.compile(r"(?<![a-zA-Z0-9])(\d{1,2})[xX](\d{1,2})[-_.](\d{1,2})(?![a-zA-Z0-9])"),
+    # Single episode: S01E02, s1e2
+    re.compile(r"(?<![a-zA-Z0-9])[sS](\d{1,2})[eE](\d{1,2})(?![a-zA-Z0-9])"),
+    # Single episode: 1x02, 01x02
+    re.compile(r"(?<![a-zA-Z0-9])(\d{1,2})[xX](\d{1,2})(?![a-zA-Z0-9])"),
+    # Episode number: Ep02, EP.02, ep2
+    re.compile(r"(?<![a-zA-Z0-9])[eE][pP]\.?\s*(\d{1,3})(?![a-zA-Z0-9])"),
+    # Episode number: E02, e02
+    re.compile(r"(?<![a-zA-Z0-9])[eE](\d{1,3})(?![a-zA-Z0-9])"),
 ]
 
 
 def extract_episode_id(filename: str) -> Optional[str]:
-    """Extracts a normalized episode identifier like 's01e02' or 'ep02'."""
+    """Extracts a normalized episode identifier like 's01e02', 's01e01-e02' or 'ep02'."""
     for regex in _EPISODE_REGEXES:
         match = regex.search(filename)
         if match:
             groups = match.groups()
-            if len(groups) == 2:
+            if len(groups) == 3:
+                s, e1, e2 = int(groups[0]), int(groups[1]), int(groups[2])
+                return f"s{s:02d}e{e1:02d}-e{e2:02d}"
+            elif len(groups) == 2:
                 s, e = int(groups[0]), int(groups[1])
                 return f"s{s:02d}e{e:02d}"
             elif len(groups) == 1:

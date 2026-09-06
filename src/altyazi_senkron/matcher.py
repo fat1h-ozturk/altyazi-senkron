@@ -30,8 +30,8 @@ class SubtitleMatcher:
 
     def __init__(
         self,
-        min_speed: float = 0.79,   # widened to cover 24/29.97
-        max_speed: float = 1.22,   # widened to cover 30/25
+        min_speed: float = 0.79,   # widened to cover 24/29.97 (~0.80080)
+        max_speed: float = 1.26,   # widened to cover 29.97/24 (~1.24875)
         inlier_tolerance: float = 0.40,  # Max distance in seconds to consider an inlier
     ):
         self.min_speed = min_speed
@@ -323,45 +323,76 @@ class SubtitleMatcher:
 
         return refined_slope, refined_offset, new_inliers_mask
 
-    def _detect_piecewise_cuts(
+    def _compute_inliers_mask(
+        self,
+        sub_mids: np.ndarray,
+        audio_mids: np.ndarray,
+        slope: float,
+        offset: float,
+    ) -> np.ndarray:
+        """Computes boolean inlier mask for a given slope and offset."""
+        if len(sub_mids) == 0 or len(audio_mids) == 0:
+            return np.array([], dtype=bool)
+        mapped = slope * sub_mids + offset
+        idx = np.searchsorted(audio_mids, mapped)
+        c0 = np.clip(idx, 0, len(audio_mids) - 1)
+        c1 = np.clip(idx - 1, 0, len(audio_mids) - 1)
+        d0 = np.abs(audio_mids[c0] - mapped)
+        d1 = np.abs(audio_mids[c1] - mapped)
+        min_dist = np.minimum(d0, d1)
+        return min_dist <= self.inlier_tolerance
+
+    def _split_cuts_recursive(
         self,
         subtitles: List[SubtitleItem],
         sub_mids: np.ndarray,
         audio_mids: np.ndarray,
         base_slope: float,
-        base_offset: float,
-        inliers_mask: np.ndarray,
+        current_offset: float,
+        current_inliers_mask: Optional[np.ndarray] = None,
+        depth: int = 0,
+        max_depth: int = 3,
     ) -> List[AlignmentSegment]:
         """
-        Detects discontinuities (e.g. TV commercial breaks or deleted scenes).
-        If non-matching chunks form consistent shifts, splits into piecewise segments.
+        Recursively splits subtitles into segments if discontinuities (commercial cuts) exist.
+        Supports multiple cuts across the video up to max_depth levels.
         """
         total_subs = len(subtitles)
-        if total_subs < 20:
-            # Not enough data for reliable piecewise segmentation
+        if total_subs == 0:
+            return []
+
+        if current_inliers_mask is None:
+            current_inliers_mask = self._compute_inliers_mask(
+                sub_mids, audio_mids, base_slope, current_offset
+            )
+
+        inliers_count = int(np.sum(current_inliers_mask))
+        confidence = inliers_count / max(1, total_subs)
+
+        # Base case 1: Not enough subtitles for splitting or max depth reached
+        if total_subs < 20 or depth >= max_depth:
             return [
                 AlignmentSegment(
                     sub_start=subtitles[0].start,
                     sub_end=subtitles[-1].end,
                     slope=base_slope,
-                    offset=base_offset,
-                    inliers_count=int(np.sum(inliers_mask)),
-                    confidence=float(np.sum(inliers_mask)) / max(1, total_subs),
+                    offset=current_offset,
+                    inliers_count=inliers_count,
+                    confidence=confidence,
                 )
             ]
 
-        # Check if there is a large continuous stretch of outliers
-        outlier_indices = np.where(~inliers_mask)[0]
+        # Base case 2: 85%+ inliers match current line, no piecewise cut needed
+        outlier_indices = np.where(~current_inliers_mask)[0]
         if len(outlier_indices) < total_subs * 0.15:
-            # 85%+ inliers match global line, no piecewise cuts needed
             return [
                 AlignmentSegment(
                     sub_start=subtitles[0].start,
                     sub_end=subtitles[-1].end,
                     slope=base_slope,
-                    offset=base_offset,
-                    inliers_count=int(np.sum(inliers_mask)),
-                    confidence=float(np.sum(inliers_mask)) / total_subs,
+                    offset=current_offset,
+                    inliers_count=inliers_count,
+                    confidence=confidence,
                 )
             ]
 
@@ -372,7 +403,7 @@ class SubtitleMatcher:
             scaled_outliers, audio_mids
         )
 
-        if sec_score > len(outlier_indices) * 0.35 and abs(sec_offset - base_offset) > 1.0:
+        if sec_score > len(outlier_indices) * 0.35 and abs(sec_offset - current_offset) > 1.0:
             # Find distances to audio for both candidate offsets
             def get_mapped_min_dist(offset: float) -> np.ndarray:
                 mapped = base_slope * sub_mids + offset
@@ -383,10 +414,9 @@ class SubtitleMatcher:
                 d1 = np.abs(audio_mids[c1] - mapped)
                 return np.minimum(d0, d1)
 
-            dist_base = get_mapped_min_dist(base_offset)
+            dist_base = get_mapped_min_dist(current_offset)
             dist_sec = get_mapped_min_dist(sec_offset)
 
-            # Indicator: 1 if sec_offset is better, 0 if base_offset is better
             sec_is_better = (dist_sec < dist_base).astype(int)
             cum_sec = np.cumsum(sec_is_better)
             total_sec_better = cum_sec[-1]
@@ -395,12 +425,9 @@ class SubtitleMatcher:
             min_errors = total_subs
             first_is_base = True
 
-            # Evaluate all possible split points
             min_margin = max(5, int(total_subs * 0.10))
             for k in range(min_margin, total_subs - min_margin):
-                # Pattern A: [0:k] uses base, [k:] uses sec
                 err_a = cum_sec[k - 1] + ((total_subs - k) - (total_sec_better - cum_sec[k - 1]))
-                # Pattern B: [0:k] uses sec, [k:] uses base
                 err_b = (k - cum_sec[k - 1]) + (total_sec_better - cum_sec[k - 1])
 
                 if err_a < min_errors:
@@ -413,37 +440,64 @@ class SubtitleMatcher:
                     first_is_base = False
 
             if best_k > 0 and (total_subs - min_errors) >= int(total_subs * 0.60):
-                offset_first = base_offset if first_is_base else sec_offset
-                offset_second = sec_offset if first_is_base else base_offset
+                offset_first = current_offset if first_is_base else sec_offset
+                offset_second = sec_offset if first_is_base else current_offset
 
-                seg1 = AlignmentSegment(
-                    sub_start=subtitles[0].start,
-                    sub_end=subtitles[best_k - 1].end,
-                    slope=base_slope,
-                    offset=offset_first,
-                    inliers_count=best_k,
-                    confidence=1.0 - (min_errors / total_subs),
+                # Recursively process left and right slices to discover further cuts
+                left_segs = self._split_cuts_recursive(
+                    subtitles[:best_k],
+                    sub_mids[:best_k],
+                    audio_mids,
+                    base_slope,
+                    offset_first,
+                    depth=depth + 1,
+                    max_depth=max_depth,
                 )
-                seg2 = AlignmentSegment(
-                    sub_start=subtitles[best_k].start,
-                    sub_end=subtitles[-1].end,
-                    slope=base_slope,
-                    offset=offset_second,
-                    inliers_count=total_subs - best_k,
-                    confidence=1.0 - (min_errors / total_subs),
+                right_segs = self._split_cuts_recursive(
+                    subtitles[best_k:],
+                    sub_mids[best_k:],
+                    audio_mids,
+                    base_slope,
+                    offset_second,
+                    depth=depth + 1,
+                    max_depth=max_depth,
                 )
-                return [seg1, seg2]
+                return left_segs + right_segs
 
         return [
             AlignmentSegment(
                 sub_start=subtitles[0].start,
                 sub_end=subtitles[-1].end,
                 slope=base_slope,
-                offset=base_offset,
-                inliers_count=int(np.sum(inliers_mask)),
-                confidence=float(np.sum(inliers_mask)) / total_subs,
+                offset=current_offset,
+                inliers_count=inliers_count,
+                confidence=confidence,
             )
         ]
+
+    def _detect_piecewise_cuts(
+        self,
+        subtitles: List[SubtitleItem],
+        sub_mids: np.ndarray,
+        audio_mids: np.ndarray,
+        base_slope: float,
+        base_offset: float,
+        inliers_mask: np.ndarray,
+    ) -> List[AlignmentSegment]:
+        """
+        Detects discontinuities (e.g. TV commercial breaks or deleted scenes).
+        Recursively splits non-matching chunks into piecewise segments.
+        """
+        return self._split_cuts_recursive(
+            subtitles=subtitles,
+            sub_mids=sub_mids,
+            audio_mids=audio_mids,
+            base_slope=base_slope,
+            current_offset=base_offset,
+            current_inliers_mask=inliers_mask,
+            depth=0,
+            max_depth=3,
+        )
 
     def _compute_alignment_confidence(
         self,

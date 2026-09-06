@@ -6,6 +6,9 @@ from altyazi_senkron.batch import find_video_subtitle_pairs, extract_episode_id,
 def test_extract_episode_id():
     assert extract_episode_id("Breaking.Bad.S01E05.720p.mkv") == "s01e05"
     assert extract_episode_id("dizi_1x03.mp4") == "s01e03"
+    assert extract_episode_id("Show.S02E01-E02.1080p.mkv") == "s02e01-e02"
+    assert extract_episode_id("Show.S02E01-02.1080p.mkv") == "s02e01-e02"
+    assert extract_episode_id("Show.02x01-02.1080p.mkv") == "s02e01-e02"
     assert extract_episode_id("Movie.2024.1080p.mkv") is None
 
 
