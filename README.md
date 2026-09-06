@@ -1,6 +1,6 @@
 # altyazi-senkron
 
-**altyazi-senkron**, `ffsubsync` ve `alass-cli` gibi geleneksel araçların sıklıkla başarısız olduğu, anlamsız kaymalar yaptığı ve müzik/patlama seslerine takıldığı senaryoları çözmek için geliştirilmiş **yeni nesil, AI destekli ve yüksek hassasiyetli (%99+ kesinlik)** altyazı senkronizasyon aracıdır.
+**altyazi-senkron**, `ffsubsync` ve `alass-cli` gibi geleneksel araçların sıklıkla başarısız olduğu, anlamsız kaymalar yaptığı ve müzik/patlama seslerine takıldığı senaryoları çözmek için geliştirilmiş **yeni nesil, AI destekli ve yüksek hassasiyetli altyazı senkronizasyon aracıdır.
 
 ---
 
@@ -13,7 +13,7 @@
 | **FPS / Hız Farkı (Drift)** | 23.976 $\leftrightarrow$ 25 FPS dönüşümlerinde zamanla açılma yaşanabilir. | Standart film/video kare hızlarını otomatik dener ve en küçük sapmayı hesaplar. |
 | **Parçalı Kesintiler (Piecewise)** | TV reklam araları veya kesilmiş sahnelerde zincirleme olarak dağılır. | **Değişim noktası analizi (Change-point)** ile filmi parçalara ayırarak çözer. |
 | **Milisaniyelik Uyum (Snapping)** | Altyazı kabaca oturur fakat diyalog başlangıcına tam kenetlenmez. | **Snapper Motoru** ile altyazı başlangıç ve bitişini konuşma sınırına kilitler. |
-| **Doğrulama ve Güven Skoru** | Hatalı çıksa bile kullanıcıya bildirmeden yanlış dosyayı kaydeder. | İşlem sonunda **Güven Skoru (%98.4)** ve örtüşme raporu sunar. |
+| **Doğrulama ve Güven Skoru** | Hatalı çıksa bile kullanıcıya bildirmeden yanlış dosyayı kaydeder. | İşlem sonunda Güven Skoru ve örtüşme raporu sunar. |
 
 ---
 
@@ -179,6 +179,4 @@ Geliştiriciler için birim ve entegrasyon testleri:
 ```bash
 pytest -v
 ```
-
----
 
